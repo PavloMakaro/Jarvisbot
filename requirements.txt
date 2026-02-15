@@ -2,7 +2,6 @@ aiogram
 openai
 aiohttp
 apscheduler
-duckduckgo-search
 python-dotenv
 httpx
 sqlalchemy
