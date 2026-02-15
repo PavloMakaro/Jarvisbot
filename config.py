@@ -9,6 +9,7 @@ BOT_TOKEN = os.getenv("BOT_TOKEN")
 DEEPSEEK_API_KEY = os.getenv("DEEPSEEK_API_KEY")
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 OCR_API_KEY = os.getenv("OCR_API_KEY")
+LANGSEARCH_API_KEY = os.getenv("LANGSEARCH_API_KEY")
 ADMIN_ID = int(os.getenv("ADMIN_ID", "0"))
 
 # Base URLs for OpenAI client compatibility

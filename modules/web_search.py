@@ -1,51 +1,64 @@
 from core.tools import registry
-from duckduckgo_search import DDGS
+import aiohttp
+import config
 import logging
+import json
 
 logger = logging.getLogger(__name__)
 
-@registry.register(name="web_search", description="Search the web for information using DuckDuckGo.")
-async def web_search(query: str, max_results: int = 5):
-    """
-    Perform a web search.
-
-    Args:
-        query: The search query string.
-        max_results: Maximum number of results to return (default 5).
-    """
+@registry.register(name="web_search", description="Search the web for information using LangSearch.")
+async def web_search(query: str, max_results: int = 5, freshness: str = None):
     logger.info(f"Searching web for: {query}")
+
+    api_url = "https://api.langsearch.com/v1/web-search"
+    headers = {
+        "Authorization": f"Bearer {config.LANGSEARCH_API_KEY}",
+        "Content-Type": "application/json"
+    }
+
+    payload = {
+        "query": query,
+        "count": max_results,
+        "summary": True
+    }
+
+    if freshness:
+        payload["freshness"] = freshness
+
     try:
-        # DDGS context manager is synchronous in some versions, but library supports async?
-        # The latest duckduckgo_search might be synchronous or async.
-        # Let's check if DDGS() works as context manager.
-        # It seems `ddgs.text()` is synchronous in the standard usage.
-        # Since we are in async function, we should ideally run this in executor if it blocks,
-        # but for simplicity and low overhead, we'll try running it directly.
-        # If it blocks too much, we might need run_in_executor.
+        async with aiohttp.ClientSession() as session:
+            async with session.post(api_url, headers=headers, json=payload) as response:
+                if response.status != 200:
+                    text = await response.text()
+                    logger.error(f"LangSearch API Error: {response.status} - {text}")
+                    return f"Search failed. API returned status {response.status}."
 
-        results = []
-        with DDGS() as ddgs:
-            # list() iterates the generator. Use backend="html" for stability.
-            for r in ddgs.text(query, max_results=max_results, backend="html"):
-                results.append(r)
+                data = await response.json()
+                logger.info(f"API Response: {json.dumps(data)}")
 
-        if not results:
-            # Fallback to lite backend if html fails or returns empty
-            try:
-                with DDGS() as ddgs:
-                    for r in ddgs.text(query, max_results=max_results, backend="lite"):
-                        results.append(r)
-            except Exception:
-                pass
+                if "webPages" not in data or "value" not in data["webPages"]:
+                     return "No results found."
 
-        if not results:
-            return "No results found."
+                web_pages = data["webPages"]["value"]
 
-        formatted_results = []
-        for r in results:
-            formatted_results.append(f"Title: {r.get('title')}\nLink: {r.get('href')}\nSnippet: {r.get('body')}")
+                if not web_pages:
+                    return "No results found."
 
-        return "\n\n".join(formatted_results)
+                formatted_results = []
+                for r in web_pages:
+                    title = r.get("name", "No Title")
+                    url = r.get("url", "#")
+                    snippet = r.get("snippet", "No snippet")
+                    summary = r.get("summary", "")
+
+                    entry = f"Title: {title}\nLink: {url}\nSnippet: {snippet}"
+                    if summary:
+                        entry += f"\nSummary: {summary[:200]}..."
+
+                    formatted_results.append(entry)
+
+                return "\n\n".join(formatted_results)
+
     except Exception as e:
         logger.error(f"Search failed: {e}")
         return f"Search failed: {str(e)}"
