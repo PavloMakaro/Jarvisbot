@@ -1,0 +1,11 @@
+aiogram
+openai
+aiohttp
+apscheduler
+duckduckgo-search
+python-dotenv
+httpx
+sqlalchemy
+python-dateutil
+aiosqlite
+telegramify-markdown
